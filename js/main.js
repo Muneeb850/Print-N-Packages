@@ -407,7 +407,6 @@
       c.addEventListener('mousemove', (e) => {
         const r = c.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
         ry((x - .5) * 12); rx((.5 - y) * 12);
-        c.style.setProperty('--mx', x * 100 + '%'); c.style.setProperty('--my', y * 100 + '%');
       });
       c.addEventListener('mouseleave', () => { rx(0); ry(0); });
     });
