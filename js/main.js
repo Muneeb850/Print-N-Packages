@@ -261,15 +261,18 @@
   if ($('.hstack')) {
     $$('.hstack figure').forEach((f, i) => G.to(f, { y: (i + 1) * -50, ease: 'none', scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true } }));
     G.to('.hero .wrap', { y: -60, opacity: .2, ease: 'none', scrollTrigger: { trigger: '.hero', start: '60% top', end: 'bottom top', scrub: true } });
-    if (fine) {
+    {
       const hs = $('.hstack'), figs = $$('.hstack figure'), depth = [28, 18, 40];
       const rx = G.quickTo(hs, 'rotationX', { duration: .8, ease: 'power3' }), ry = G.quickTo(hs, 'rotationY', { duration: .8, ease: 'power3' });
       const mv = figs.map((f) => [G.quickTo(f, 'x', { duration: .9, ease: 'power3' })]);
-      $('.hero').addEventListener('mousemove', (e) => {
-        const nx = e.clientX / innerWidth - .5, ny = e.clientY / innerHeight - .5;
+      const aim = (cx, cy) => {
+        const nx = cx / innerWidth - .5, ny = cy / innerHeight - .5;
         ry(nx * 12); rx(-ny * 10);
         mv.forEach((m, i) => m[0](nx * depth[i]));
-      });
+      };
+      if (fine) $('.hero').addEventListener('mousemove', (e) => aim(e.clientX, e.clientY));
+      $('.hero').addEventListener('touchmove', (e) => { const t = e.touches[0]; t && aim(t.clientX, t.clientY); }, { passive: true });
+      $('.hero').addEventListener('touchend', () => aim(innerWidth / 2, innerHeight / 2), { passive: true });
     }
   } else {
     G.to('.hero .wrap', { y: -50, opacity: .2, ease: 'none', scrollTrigger: { trigger: '.hero', start: '55% top', end: 'bottom top', scrub: true } });
@@ -305,6 +308,8 @@
       G.fromTo(p, { yPercent: -d }, { yPercent: d, ease: 'none', scrollTrigger: { trigger: wall, start: 'top bottom', end: 'bottom top', scrub: true } });
       p.addEventListener('mouseenter', () => G.to(p, { rotate: 0, scale: 1.08, zIndex: 6, duration: .6, ease: 'expo.out' }));
       p.addEventListener('mouseleave', () => G.to(p, { rotate: r, scale: 1, zIndex: 1, duration: .8, ease: 'elastic.out(1,.6)' }));
+      p.addEventListener('touchstart', () => G.to(p, { rotate: 0, scale: 1.08, zIndex: 6, duration: .6, ease: 'expo.out' }), { passive: true });
+      ['touchend', 'touchcancel'].forEach((ev) => p.addEventListener(ev, () => G.to(p, { rotate: r, scale: 1, zIndex: 1, duration: .8, ease: 'elastic.out(1,.6)' }), { passive: true }));
     });
   });
   const skewTargets = $$('.pol,.tilt,.trail-img');
@@ -332,6 +337,8 @@
     const at = (e) => { const r = trail.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
     trail.addEventListener('mousemove', (e) => { const [x, y] = at(e); if (Math.hypot(x - lx, y - ly) > 120) { lx = x; ly = y; spawn(x, y); } });
     trail.addEventListener('pointerdown', (e) => { const [x, y] = at(e); spawn(x, y); });
+    trail.addEventListener('touchmove', (e) => { const t = e.touches[0]; if (!t) return; const [x, y] = at(t); if (Math.hypot(x - lx, y - ly) > 90) { lx = x; ly = y; spawn(x, y); } }, { passive: true });
+    if (!fine) { const h = $('h2', trail); if (h) h.innerHTML = 'Touch the <span class="it acc">screen.</span>'; }
     G.from(trail, { clipPath: 'inset(8% 8% 8% 8% round 60px)', ease: 'none', scrollTrigger: { trigger: trail, start: 'top 95%', end: 'top 35%', scrub: true } });
   }
 
@@ -376,7 +383,7 @@
   const hs = $('.hs'), track = $('.hs-track'), bar = $('.hs-bar i');
   if (hs && track) {
     const mm = G.matchMedia();
-    mm.add('(min-width: 761px)', () => {
+    mm.add('(min-width: 0px)', () => {
       G.to(track, { x: () => -(track.scrollWidth - document.documentElement.clientWidth), ease: 'none',
         scrollTrigger: { trigger: hs, start: 'top top', end: () => '+=' + (track.scrollWidth - innerWidth), pin: true, scrub: .8, invalidateOnRefresh: true, anticipatePin: 1,
           onUpdate: (s) => { if (bar) bar.style.transform = `scaleX(${s.progress})`; } } });
@@ -385,7 +392,7 @@
 
   /* services: floating photo preview that chases the cursor */
   const rows = $$('.svc[data-img]');
-  if (rows.length && fine && innerWidth > 900) {
+  if (rows.length) {
     const prev = document.createElement('div'); prev.className = 'prev';
     prev.innerHTML = rows.map(r => `<img src="${r.dataset.img}" alt="">`).join('');
     document.body.appendChild(prev);
@@ -396,20 +403,32 @@
     rows.forEach((r, i) => {
       r.addEventListener('mouseenter', () => { imgs.forEach((im, k) => im.classList.toggle('on', k === i)); G.to(prev, { opacity: 1, scale: 1, duration: .6, ease: 'expo.out', overwrite: 'auto' }); });
       r.addEventListener('mouseleave', () => G.to(prev, { opacity: 0, scale: .6, duration: .4, ease: 'power3.in', overwrite: 'auto' }));
-      r.addEventListener('mousemove', (e) => { px(e.clientX + 120); py(e.clientY); pr((e.clientX - lastX) * .4); lastX = e.clientX; });
+      if (fine && innerWidth > 900) r.addEventListener('mousemove', (e) => { px(e.clientX + 120); py(e.clientY); pr((e.clientX - lastX) * .4); lastX = e.clientX; });
+      /* touch: preview pops up beside the finger while pressed */
+      const tpos = (e) => { const t = e.touches[0]; if (!t) return; const w = prev.offsetWidth; px(innerWidth - w / 2 - 16); py(Math.max(w * .625 + 8, t.clientY - w * .625 - 24)); pr(0); };
+      r.addEventListener('touchstart', (e) => { if (fine && innerWidth > 900) return; imgs.forEach((im, k) => im.classList.toggle('on', k === i)); tpos(e); G.to(prev, { opacity: 1, scale: 1, duration: .6, ease: 'expo.out', overwrite: 'auto' }); }, { passive: true });
+      r.addEventListener('touchmove', tpos, { passive: true });
+      ['touchend', 'touchcancel'].forEach((ev) => r.addEventListener(ev, () => G.to(prev, { opacity: 0, scale: .6, duration: .4, ease: 'power3.in', overwrite: 'auto' }), { passive: true }));
     });
   }
 
-  /* 3D tilt cards + magnetic buttons */
-  if (fine) {
+  /* 3D tilt cards (mouse + touch) */
+  {
     $$('.card').forEach((c) => {
       const rx = G.quickTo(c, 'rotationX', { duration: .6, ease: 'power3' }), ry = G.quickTo(c, 'rotationY', { duration: .6, ease: 'power3' });
-      c.addEventListener('mousemove', (e) => {
-        const r = c.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+      const tiltTo = (cx, cy) => {
+        const r = c.getBoundingClientRect(), x = (cx - r.left) / r.width, y = (cy - r.top) / r.height;
         ry((x - .5) * 12); rx((.5 - y) * 12);
-      });
+      };
+      if (fine) c.addEventListener('mousemove', (e) => tiltTo(e.clientX, e.clientY));
       c.addEventListener('mouseleave', () => { rx(0); ry(0); });
+      ['touchstart', 'touchmove'].forEach((ev) => c.addEventListener(ev, (e) => { const t = e.touches[0]; t && tiltTo(t.clientX, t.clientY); }, { passive: true }));
+      ['touchend', 'touchcancel'].forEach((ev) => c.addEventListener(ev, () => { rx(0); ry(0); }, { passive: true }));
     });
+  }
+
+  /* magnetic buttons */
+  if (fine) {
     $$('.btn,.burger,.wa').forEach((b) => {
       const qx = G.quickTo(b, 'x', { duration: .5, ease: 'power3' }), qy = G.quickTo(b, 'y', { duration: .5, ease: 'power3' });
       b.addEventListener('mousemove', (e) => { const r = b.getBoundingClientRect(); qx((e.clientX - r.left - r.width / 2) * .3); qy((e.clientY - r.top - r.height / 2) * .4); });
